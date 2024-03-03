@@ -1,8 +1,7 @@
 ---
-title: "Climate"
-author: "Kota, Yasomitra Sampat"
-date: "2023-05-07"
-output: pdf_document
+title: "Japan's Land Temperature Forecasting"
+date: "May 2023"
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -19,77 +18,67 @@ library(zoo)
 library(xts)
 ```
 
+1. Reading the data
 ```{r}
-
 global_temp= read.csv("GlobalLandTemperaturesByCountry.csv")
-
 global_temp_jpn = filter(global_temp, Country == "Japan")
-
-
-
 ```
 
-
+2. Cleaning the data
 ```{r}
-
-sum(is.na(global_temp_jpn$AverageTemperature))
+# Missing Values
+print(paste0("The number of missing values are, ", sum(is.na(global_temp_jpn$AverageTemperature))))
+tail(global_temp_jpn)
 global_temp_jpn= global_temp_jpn[1:2072, ]
 
-dim(global_temp_jpn)
+# Data Format
 str(global_temp_jpn)
 global_temp_jpn$date= as.Date(global_temp_jpn$dt, format = "%Y-%m-%d")
-
-
 str(global_temp_jpn)
 
+
+# Time Series Object
 global_temp_jpn_ts= as.xts(x = global_temp_jpn[, c(-1, -4, -5)],
                            order.by = global_temp_jpn$date)
-
-```
-
-```{r}
 head(global_temp_jpn_ts)
-tail(global_temp_jpn_ts)
 ```
-
 
 ```{r fig.height=5, fig.width=15}
-plot(global_temp_jpn_ts$AverageTemperature, main= "Average Land Temperature of Japan")
-
+plot(global_temp_jpn_ts$AverageTemperature[20:50], main= "Average Land Temperature of Japan")
 ```
 
+3. Train Test Split
 ```{r}
-dim(global_temp_jpn_ts)
+n= dim(global_temp_jpn_ts)[1]
+trn_n= floor(n*0.8)
 
-2072*0.8
-
-train= global_temp_jpn_ts[1:1657, ]
-
+train= global_temp_jpn_ts[1:trn_n, ]
 dim(train)
 
-test= global_temp_jpn_ts[1658:2072, ]
-
+test= global_temp_jpn_ts[(trn_n+1):n, ]
 dim(test)
-
-#2072-1657
+```
+4. Analyzing TS data and Finding the best model and parameters
+```{r}
+acf2(train$AverageTemperature, 
+     main= "ACF and PACF plots of Temperature before Seasonal Differencing (12)")
 ```
 
 ```{r}
-acf2(train$AverageTemperature, main= "ACF and PACF plots of Temperature before Seasonal Differencing (12)")
-```
+# Differencing Data
 
-```{r}
 diff= diff(global_temp_jpn_ts$AverageTemperature, 1)
-
-acf2(diff)
+acf2(diff, 
+     main = "ACF and PACF plots of Temperature after Seasonal Differencing (1)")
 ```
 
 ```{r}
 diff2= diff(global_temp_jpn_ts$AverageTemperature, 12)
-
-acf2(diff2, main = "ACF and PACF plots of Temperature after Seasonal Differencing (12)")
-
+acf2(diff2, 
+     main = "ACF and PACF plots of Temperature after Seasonal Differencing (12)")
 ```
+
+After analyzinf the above plot, the possible p, d, q and P, D, Q are
 p= 1, 2
 d= 0, 1
 q= 0, 1, 2
@@ -99,12 +88,8 @@ D= 0, 1
 Q= 0, 1
 
 S= 12
-```{r}
-#auto.arima(global_temp_jpn$AvgTemp, seasonal = T)
-```
 
 ```{r}
-
 p= c(1, 2)
 d= c(0, 1)
 q= c(0, 1, 2)
@@ -143,95 +128,40 @@ for (i in p){
   }
   
 }
-
-
 ```
 
-211211
-202411
-202311
-201211
-200311
-200211
-102211
+After analyzing the above plots, the possible parameters are
+- 211211
+- 202411
+- 202311
+- 201211
+- 200311
+- 200211
+- 102211
 ```{r}
-
 sarima(train$AverageTemperature, 2, 1, 1, 2, 1, 1, 12)
 sarima(train$AverageTemperature, 2, 0, 2, 4, 1, 1, 12)
 sarima(train$AverageTemperature, 2, 0, 2, 3, 1, 1, 12)
-
-
-
-
-library(tictoc)
-
-
-```
-
-```{r}
-tic()
 sarima(train$AverageTemperature, 2, 0, 2, 4, 1, 1, 12)
-toc()
-```
-
-```{r}
 sarima(train$AverageTemperature, 1, 0, 1, 2, 1, 0, 12)
 ```
 
-
-
 ```{r}
-pred= sarima.for(train$AverageTemperature, n.ahead =415, 2, 0, 2, 4, 1, 1, 12)
+# After analyzing the above plots, the best combinations could be 2, 0, 2, 4, 1, 1 or 1, 0, 1, 2, 1, 0
 
+tst_n= dim(test)
+pred= sarima.for(train$AverageTemperature, n.ahead =tst_n, 2, 0, 2, 4, 1, 1, 12)
+accuracy(object= pred$pred, test$AverageTemperature)
 
+pred= sarima.for(train$AverageTemperature, n.ahead =tst_n, 1, 0, 1, 2, 1, 0, 12)
 accuracy(object= pred$pred, test$AverageTemperature)
 ```
 
+5. Forecast the next 5 months
 ```{r}
-pred= sarima.for(train$AverageTemperature, n.ahead =415, 1, 0, 1, 2, 1, 0, 12)
+temperature= ts(global_temp_jpn_ts$AverageTemperature, 
+                start= c(1841,1), end = c(2013, 08), frequency = 12)
 
-
-accuracy(object= pred$pred, test$AverageTemperature)
-
-```
-```{r}
-
-forecast= sarima.for(global_temp_jpn_ts$AverageTemperature, n.ahead =5, 2, 0, 2, 4, 1, 1, 12)
-
-ts(global_temp_jpn_ts$AverageTemperature)
-
-
-```
-
-```{r}
-
-forecast$pred
-
-
-plot(global_temp_jpn_ts)
-
-
-```
-
-
-
-```{r}
-
-ts_obj= ts(global_temp_jpn_ts$AverageTemperature, start= c(1841,1), end = c(2013, 08), frequency = 12)
-  
-
-
-
-
-```
-
-```{r}
-Temperature= ts_obj
-forecast= sarima.for(Temperature, n.ahead =5, 2, 0, 2, 4, 1, 1, 12)
-```
-
-
-```{r}
-global_temp_jpn_ts$AverageTemperature
+forecast= sarima.for(temperature, n.ahead =5, 2, 0, 2, 4, 1, 1, 12)
 ```
 
