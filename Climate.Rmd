@@ -1,0 +1,237 @@
+---
+title: "Climate"
+author: "Kota, Yasomitra Sampat"
+date: "2023-05-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(astsa)
+library(tseries)
+library(dplyr) 
+library(ggplot2)
+library(forecast)
+library(imputeTS)
+library(dynlm)
+library(zoo)
+library(xts)
+```
+
+```{r}
+
+global_temp= read.csv("GlobalLandTemperaturesByCountry.csv")
+
+global_temp_jpn = filter(global_temp, Country == "Japan")
+
+
+
+```
+
+
+```{r}
+
+sum(is.na(global_temp_jpn$AverageTemperature))
+global_temp_jpn= global_temp_jpn[1:2072, ]
+
+dim(global_temp_jpn)
+str(global_temp_jpn)
+global_temp_jpn$date= as.Date(global_temp_jpn$dt, format = "%Y-%m-%d")
+
+
+str(global_temp_jpn)
+
+global_temp_jpn_ts= as.xts(x = global_temp_jpn[, c(-1, -4, -5)],
+                           order.by = global_temp_jpn$date)
+
+```
+
+```{r}
+head(global_temp_jpn_ts)
+tail(global_temp_jpn_ts)
+```
+
+
+```{r fig.height=5, fig.width=15}
+plot(global_temp_jpn_ts$AverageTemperature, main= "Average Land Temperature of Japan")
+
+```
+
+```{r}
+dim(global_temp_jpn_ts)
+
+2072*0.8
+
+train= global_temp_jpn_ts[1:1657, ]
+
+dim(train)
+
+test= global_temp_jpn_ts[1658:2072, ]
+
+dim(test)
+
+#2072-1657
+```
+
+```{r}
+acf2(train$AverageTemperature, main= "ACF and PACF plots of Temperature before Seasonal Differencing (12)")
+```
+
+```{r}
+diff= diff(global_temp_jpn_ts$AverageTemperature, 1)
+
+acf2(diff)
+```
+
+```{r}
+diff2= diff(global_temp_jpn_ts$AverageTemperature, 12)
+
+acf2(diff2, main = "ACF and PACF plots of Temperature after Seasonal Differencing (12)")
+
+```
+p= 1, 2
+d= 0, 1
+q= 0, 1, 2
+
+P= 2, 3, 4
+D= 0, 1
+Q= 0, 1
+
+S= 12
+```{r}
+#auto.arima(global_temp_jpn$AvgTemp, seasonal = T)
+```
+
+```{r}
+
+p= c(1, 2)
+d= c(0, 1)
+q= c(0, 1, 2)
+
+P= c(2, 3, 4)
+D= c(0, 1)
+Q= c(0, 1)
+
+for (i in p){
+  
+  for (j in d){
+    
+    for (k in q){
+      
+      for (l in P){
+        
+        for (m in D){
+          
+          for (n in Q){
+            
+            tryCatch({
+              
+              print(paste(i, j, k, l, m , n, sep = ","))
+              sarima(train$AverageTemperature, i, j, k, l, m, n, 12)
+              
+            }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+            
+          }
+          
+        }
+        
+      }
+      
+    }
+    
+  }
+  
+}
+
+
+```
+
+211211
+202411
+202311
+201211
+200311
+200211
+102211
+```{r}
+
+sarima(train$AverageTemperature, 2, 1, 1, 2, 1, 1, 12)
+sarima(train$AverageTemperature, 2, 0, 2, 4, 1, 1, 12)
+sarima(train$AverageTemperature, 2, 0, 2, 3, 1, 1, 12)
+
+
+
+
+library(tictoc)
+
+
+```
+
+```{r}
+tic()
+sarima(train$AverageTemperature, 2, 0, 2, 4, 1, 1, 12)
+toc()
+```
+
+```{r}
+sarima(train$AverageTemperature, 1, 0, 1, 2, 1, 0, 12)
+```
+
+
+
+```{r}
+pred= sarima.for(train$AverageTemperature, n.ahead =415, 2, 0, 2, 4, 1, 1, 12)
+
+
+accuracy(object= pred$pred, test$AverageTemperature)
+```
+
+```{r}
+pred= sarima.for(train$AverageTemperature, n.ahead =415, 1, 0, 1, 2, 1, 0, 12)
+
+
+accuracy(object= pred$pred, test$AverageTemperature)
+
+```
+```{r}
+
+forecast= sarima.for(global_temp_jpn_ts$AverageTemperature, n.ahead =5, 2, 0, 2, 4, 1, 1, 12)
+
+ts(global_temp_jpn_ts$AverageTemperature)
+
+
+```
+
+```{r}
+
+forecast$pred
+
+
+plot(global_temp_jpn_ts)
+
+
+```
+
+
+
+```{r}
+
+ts_obj= ts(global_temp_jpn_ts$AverageTemperature, start= c(1841,1), end = c(2013, 08), frequency = 12)
+  
+
+
+
+
+```
+
+```{r}
+Temperature= ts_obj
+forecast= sarima.for(Temperature, n.ahead =5, 2, 0, 2, 4, 1, 1, 12)
+```
+
+
+```{r}
+global_temp_jpn_ts$AverageTemperature
+```
+
